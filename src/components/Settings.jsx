@@ -4,29 +4,28 @@ export default function Settings({
   darkMode,
   onThemeToggle,
   connectedDevice,
-  onDisconnect,
+  deviceName,
   onRenameDevice,
-  onResetSettings,
+  onDisconnect,
+  onResetSettings
 }) {
   const [showRenameInput, setShowRenameInput] = useState(false);
-  const [newName, setNewName] = useState(connectedDevice?.name || '');
+  const [newName, setNewName] = useState(deviceName);
 
   const handleRename = () => {
-    if (newName.trim() && newName !== connectedDevice?.name) {
+    if (newName.trim() && newName !== deviceName) {
       onRenameDevice(newName);
       setShowRenameInput(false);
-    }
-  };
-
-  const handleResetConfirm = () => {
-    if (window.confirm('Reset all settings? This will clear device history, theme preferences, and connection state.')) {
-      onResetSettings();
     }
   };
 
   const cardClass = darkMode 
     ? 'bg-slate-900 border-slate-800' 
     : 'bg-slate-50 border-slate-200';
+
+  const inputClass = darkMode
+    ? 'bg-slate-800 border-slate-700 text-white'
+    : 'bg-white border-slate-300 text-slate-900';
 
   return (
     <div className={`border-b ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}>
@@ -37,7 +36,7 @@ export default function Settings({
             <div>
               <p className="font-medium">Dark Mode</p>
               <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                Toggle between light and dark theme
+                Toggle theme preference
               </p>
             </div>
             <button
@@ -72,12 +71,9 @@ export default function Settings({
                       type="text"
                       value={newName}
                       onChange={(e) => setNewName(e.target.value)}
-                      className={`flex-1 px-3 py-2 rounded border ${
-                        darkMode
-                          ? 'bg-slate-800 border-slate-700 text-white'
-                          : 'bg-white border-slate-300 text-slate-900'
-                      }`}
+                      className={`flex-1 px-3 py-2 rounded border ${inputClass}`}
                       placeholder="Device name"
+                      autoFocus
                     />
                     <button
                       onClick={handleRename}
@@ -86,19 +82,18 @@ export default function Settings({
                       Save
                     </button>
                     <button
-                      onClick={() => setShowRenameInput(false)}
-                      className={`px-3 py-2 rounded border ${
-                        darkMode
-                          ? 'bg-slate-800 border-slate-700 text-slate-300'
-                          : 'bg-slate-200 border-slate-300 text-slate-700'
-                      }`}
+                      onClick={() => {
+                        setShowRenameInput(false);
+                        setNewName(deviceName);
+                      }}
+                      className={`px-3 py-2 rounded border ${cardClass}`}
                     >
                       Cancel
                     </button>
                   </div>
                 ) : (
                   <div className="flex items-center justify-between mt-2">
-                    <p className="font-mono text-sm">{connectedDevice.name}</p>
+                    <p className="font-mono text-sm">{deviceName}</p>
                     <button
                       onClick={() => setShowRenameInput(true)}
                       className="text-emerald-500 hover:text-emerald-600 text-sm font-medium"
@@ -120,11 +115,11 @@ export default function Settings({
               {/* Disconnect Button */}
               <button
                 onClick={() => {
-                  if (window.confirm(`Disconnect from ${connectedDevice.name}?`)) {
+                  if (window.confirm(`Disconnect from ${deviceName}?`)) {
                     onDisconnect();
                   }
                 }}
-                className="w-full px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-medium transition-colors"
+                className="w-full px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-medium transition-all"
               >
                 Disconnect Device
               </button>
@@ -137,13 +132,17 @@ export default function Settings({
           <p className="font-medium mb-4">App Settings</p>
           
           <button
-            onClick={handleResetConfirm}
-            className="w-full px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-medium transition-colors"
+            onClick={() => {
+              if (window.confirm('Reset all settings? This will clear device names and preferences.')) {
+                onResetSettings();
+              }
+            }}
+            className="w-full px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-medium transition-all"
           >
             Reset All Settings
           </button>
           <p className={`text-xs mt-2 ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>
-            This will clear device history, theme preference, and connection state.
+            This will clear device names, theme preference, and connection state.
           </p>
         </div>
 
@@ -151,10 +150,10 @@ export default function Settings({
         <div className={`p-4 rounded-lg border ${cardClass}`}>
           <p className="font-medium mb-2">About</p>
           <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-            Keyholder PWA v2.0
+            Keyholder PWA v2.5
           </p>
           <p className={`text-xs mt-2 ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>
-            A proximity key-finder with BLE connectivity and real-time feedback.
+            A proximity key-finder with BLE connectivity and independent LED/buzzer control.
           </p>
         </div>
       </div>
