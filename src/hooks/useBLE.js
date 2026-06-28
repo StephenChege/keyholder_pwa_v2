@@ -34,6 +34,7 @@ export default function useBLE() {
   const ledCharacteristicRef = useRef(null);
   const buzzerCharacteristicRef = useRef(null);
   const rssiCharacteristicRef = useRef(null);
+  const pollIntervalRef = useRef(null);
 
   // ========================================================================
   // Connect to Device
@@ -75,6 +76,7 @@ export default function useBLE() {
 
       console.log('Connected to:', device.name);
       console.log('RSSI characteristic UUID:', RSSI_READ_UUID);
+      console.log('Starting RSSI polling...');
     } catch (error) {
       console.error('Connection error:', error);
       alert('Failed to connect: ' + error.message);
@@ -85,11 +87,14 @@ export default function useBLE() {
   // Disconnect from Device
   // ========================================================================
   const disconnect = useCallback(async () => {
+    // Stop polling
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+
     if (deviceRef.current) {
       try {
-        if (rssiCharacteristicRef.current) {
-          await rssiCharacteristicRef.current.stopNotifications();
-        }
         deviceRef.current.gatt.disconnect();
         console.log('Disconnected');
       } catch (error) {
@@ -174,50 +179,41 @@ export default function useBLE() {
   }, []);
 
   // ========================================================================
-  // Setup RSSI Notifications
+  // Poll RSSI (Reliable Method)
   // ========================================================================
   useEffect(() => {
     if (!rssiCharacteristicRef.current || !connectedDevice) return;
 
-    const setupRssiNotifications = async () => {
-      try {
-        // Start notifications
-        await rssiCharacteristicRef.current.startNotifications();
-        
-        // Add listener for characteristic value changes
-        const handleRssiChange = (event) => {
-          const value = event.target.value;
+    // Start polling RSSI every 500ms
+    const startPolling = async () => {
+      pollIntervalRef.current = setInterval(async () => {
+        try {
+          const value = await rssiCharacteristicRef.current.readValue();
           
           // Read as 2-byte signed integer (little-endian)
           const view = new DataView(value.buffer);
           const newRssi = view.getInt16(0, true);
           
           setRssi(newRssi);
-          setProximityPercent(rssiToProximity(newRssi));
+          const proximity = rssiToProximity(newRssi);
+          setProximityPercent(proximity);
           
-          console.log('RSSI received:', newRssi, '| Proximity:', rssiToProximity(newRssi) + '%');
-        };
-        
-        rssiCharacteristicRef.current.addEventListener(
-          'characteristicvaluechanged',
-          handleRssiChange
-        );
-        
-        console.log('RSSI notifications enabled');
-        
-        // Return cleanup function
-        return () => {
-          rssiCharacteristicRef.current?.removeEventListener(
-            'characteristicvaluechanged',
-            handleRssiChange
-          );
-        };
-      } catch (error) {
-        console.error('Setup RSSI notifications error:', error);
-      }
+          console.log('RSSI polled:', newRssi, '| Proximity:', proximity + '%');
+        } catch (error) {
+          console.error('Poll RSSI error:', error);
+        }
+      }, 500); // Poll every 500ms
     };
 
-    setupRssiNotifications();
+    startPolling();
+
+    // Cleanup on disconnect
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+    };
   }, [connectedDevice]);
 
   return {
