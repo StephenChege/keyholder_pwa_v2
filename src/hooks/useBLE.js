@@ -2,12 +2,14 @@ import { useState, useCallback, useRef } from 'react';
 
 const SERVICE_UUID = '12345678-1234-1234-1234-123456789abc';
 const LED_WRITE_UUID = 'deadbeef-1234-1234-1234-123456789abc';
+const BUZZER_WRITE_UUID = 'deadbeef-1234-1234-1234-123456789abd';
 
 export default function useBLE() {
   const [connectedDevice, setConnectedDevice] = useState(null);
   const [discoveryInProgress, setDiscoveryInProgress] = useState(false);
   const deviceRef = useRef(null);
   const ledCharacteristicRef = useRef(null);
+  const buzzerCharacteristicRef = useRef(null);
 
   const connect = useCallback(async (deviceId, deviceName) => {
     if (!navigator.bluetooth) {
@@ -23,9 +25,15 @@ export default function useBLE() {
 
       const server = await device.gatt.connect();
       const service = await server.getPrimaryService(SERVICE_UUID);
+      
+      // Get LED characteristic
       const ledCharacteristic = await service.getCharacteristic(LED_WRITE_UUID);
-
       ledCharacteristicRef.current = ledCharacteristic;
+
+      // Get Buzzer characteristic
+      const buzzerCharacteristic = await service.getCharacteristic(BUZZER_WRITE_UUID);
+      buzzerCharacteristicRef.current = buzzerCharacteristic;
+
       deviceRef.current = device;
 
       setConnectedDevice({
@@ -51,6 +59,7 @@ export default function useBLE() {
       }
       deviceRef.current = null;
       ledCharacteristicRef.current = null;
+      buzzerCharacteristicRef.current = null;
       setConnectedDevice(null);
     }
   }, []);
@@ -97,12 +106,30 @@ export default function useBLE() {
     }
   }, []);
 
+  const sendBuzzerVolume = useCallback(async (volume) => {
+    if (!buzzerCharacteristicRef.current) {
+      console.error('Buzzer characteristic not connected');
+      return;
+    }
+
+    try {
+      const value = Math.min(Math.max(volume, 0), 255);
+      const data = new Uint8Array([value]);
+      
+      await buzzerCharacteristicRef.current.writeValue(data);
+      console.log('Buzzer volume sent:', value);
+    } catch (error) {
+      console.error('Send buzzer error:', error);
+    }
+  }, []);
+
   return {
     connectedDevice,
     connect,
     disconnect,
     discoveryInProgress,
     startDiscovery,
-    sendLedBrightness
+    sendLedBrightness,
+    sendBuzzerVolume
   };
 }

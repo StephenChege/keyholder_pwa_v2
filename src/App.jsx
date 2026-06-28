@@ -4,8 +4,14 @@ import useBLE from './hooks/useBLE';
 
 export default function App() {
   const [darkMode, setDarkMode] = useState(true);
+  
+  // LED state
   const [ledOn, setLedOn] = useState(false);
   const [ledBrightness, setLedBrightness] = useState(50);
+  
+  // Buzzer state
+  const [buzzerOn, setBuzzerOn] = useState(false);
+  const [buzzerVolume, setBuzzerVolume] = useState(50);
 
   const { 
     connectedDevice, 
@@ -13,11 +19,18 @@ export default function App() {
     disconnect, 
     discoveryInProgress,
     startDiscovery,
-    sendLedBrightness
+    sendLedBrightness,
+    sendBuzzerVolume
   } = useBLE();
 
   const handleAddDevice = async () => {
     await startDiscovery();
+  };
+
+  const handleDisconnect = () => {
+    disconnect();
+    setLedOn(false);
+    setBuzzerOn(false);
   };
 
   const bgClass = darkMode ? 'bg-slate-950' : 'bg-white';
@@ -76,16 +89,18 @@ export default function App() {
               setLedOn={setLedOn}
               ledBrightness={ledBrightness}
               setLedBrightness={setLedBrightness}
+              buzzerOn={buzzerOn}
+              setBuzzerOn={setBuzzerOn}
+              buzzerVolume={buzzerVolume}
+              setBuzzerVolume={setBuzzerVolume}
               darkMode={darkMode}
               connectedDevice={connectedDevice}
               sendLedBrightness={sendLedBrightness}
+              sendBuzzerVolume={sendBuzzerVolume}
             />
 
             <button
-              onClick={() => {
-                disconnect();
-                setLedOn(false);
-              }}
+              onClick={handleDisconnect}
               className="w-full mt-6 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-medium"
             >
               Disconnect
