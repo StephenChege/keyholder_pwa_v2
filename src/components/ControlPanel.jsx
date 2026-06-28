@@ -15,7 +15,9 @@ export default function ControlPanel({
   proximityPercent,
   rssi,
   darkMode,
-  connectedDevice
+  connectedDevice,
+  sendLedBrightness,
+  sendBuzzerVolume
 }) {
   // Calculate actual values based on proximity
   const actualBrightness = proximityEnabled 
@@ -26,23 +28,31 @@ export default function ControlPanel({
     ? Math.round((buzzerVolume * proximityPercent) / 100)
     : buzzerVolume;
 
-  // Send brightness to device
+  // Send LED brightness to device
   useEffect(() => {
     if (connectedDevice && ledOn) {
-      // TODO: Send brightness value to ESP32 LED characteristic
+      sendLedBrightness(actualBrightness);
       console.log('Sending LED brightness:', actualBrightness);
+    } else if (connectedDevice && !ledOn) {
+      // Turn off LED when button is clicked OFF
+      sendLedBrightness(0);
+      console.log('Turning LED OFF');
     }
-  }, [actualBrightness, ledOn, connectedDevice]);
+  }, [actualBrightness, ledOn, connectedDevice, sendLedBrightness]);
 
-  // Send volume to device
+  // Send buzzer volume to device
   useEffect(() => {
     if (connectedDevice && buzzerOn) {
-      // TODO: Send volume value to ESP32 buzzer characteristic
+      sendBuzzerVolume(actualVolume);
       // Also calculate frequency: 400Hz (far) to 2000Hz (close)
-      const frequency = 400 + (proximityPercent * 16); // 400 + (100 * 16) = 2000
+      const frequency = 400 + (proximityPercent * 16);
       console.log('Sending buzzer volume:', actualVolume, 'frequency:', frequency);
+    } else if (connectedDevice && !buzzerOn) {
+      // Turn off buzzer when button is clicked OFF
+      sendBuzzerVolume(0);
+      console.log('Turning buzzer OFF');
     }
-  }, [actualVolume, buzzerOn, proximityPercent, connectedDevice]);
+  }, [actualVolume, buzzerOn, proximityPercent, connectedDevice, sendBuzzerVolume]);
 
   const cardClass = darkMode 
     ? 'bg-slate-900 border-slate-800' 
@@ -126,7 +136,7 @@ export default function ControlPanel({
               disabled={!ledOn}
               className={`w-full ${sliderClass} disabled:opacity-50`}
             />
-            {proximityEnabled && (
+            {proximityEnabled && ledOn && (
               <p className={`text-xs mt-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                 Actual: {actualBrightness}% (slider × proximity)
               </p>
@@ -180,7 +190,7 @@ export default function ControlPanel({
               disabled={!buzzerOn}
               className={`w-full ${sliderClass} disabled:opacity-50`}
             />
-            {proximityEnabled && (
+            {proximityEnabled && buzzerOn && (
               <p className={`text-xs mt-2 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                 Actual: {actualVolume}% (slider × proximity)
               </p>
@@ -192,9 +202,9 @@ export default function ControlPanel({
       {/* Info */}
       <div className={`p-4 rounded-lg border ${cardClass}`}>
         <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-          {proximityEnabled
+          {proximityEnabled && (ledOn || buzzerOn)
             ? 'Brightness and volume are multiplied by proximity percentage. Move closer to increase output.'
-            : 'Proximity feedback is disabled. Sliders control absolute output.'}
+            : 'Sliders control absolute output (0-100%).'}
         </p>
       </div>
     </div>

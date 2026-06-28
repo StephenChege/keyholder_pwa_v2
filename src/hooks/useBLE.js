@@ -2,14 +2,17 @@ import { useState, useCallback, useRef } from 'react';
 
 const SERVICE_UUID = '12345678-1234-1234-1234-123456789abc';
 const RSSI_CHARACTERISTIC_UUID = 'abcd1234-5678-1234-5678-abcdef123457';
-const WRITE_CHARACTERISTIC_UUID = 'deadbeef-1234-1234-1234-123456789abc';
+const LED_WRITE_CHARACTERISTIC_UUID = 'deadbeef-1234-1234-1234-123456789abc';      // LED brightness
+const BUZZER_WRITE_CHARACTERISTIC_UUID = 'deadbeef-1234-1234-1234-123456789abd';   // Buzzer volume
 
 export default function useBLE() {
   const [devices, setDevices] = useState([]);
   const [connectedDevice, setConnectedDevice] = useState(null);
   const [discoveryInProgress, setDiscoveryInProgress] = useState(false);
   const deviceRef = useRef(null);
-  const characteristicRef = useRef(null);
+  const rssiCharacteristicRef = useRef(null);
+  const ledCharacteristicRef = useRef(null);
+  const buzzerCharacteristicRef = useRef(null);
 
   const connect = useCallback(async (deviceId, deviceName) => {
     if (!navigator.bluetooth) {
@@ -18,7 +21,6 @@ export default function useBLE() {
     }
 
     try {
-      // Request device by name (since we already know the name from saved devices)
       const device = await navigator.bluetooth.requestDevice({
         optionalServices: [SERVICE_UUID],
         filters: [
@@ -29,16 +31,21 @@ export default function useBLE() {
 
       const server = await device.gatt.connect();
       const service = await server.getPrimaryService(SERVICE_UUID);
-      const characteristic = await service.getCharacteristic(RSSI_CHARACTERISTIC_UUID);
+      
+      // Get RSSI characteristic for reading proximity
+      const rssiCharacteristic = await service.getCharacteristic(RSSI_CHARACTERISTIC_UUID);
+      await rssiCharacteristic.startNotifications();
+      rssiCharacteristicRef.current = rssiCharacteristic;
 
-      // Enable notifications
-      await characteristic.startNotifications();
-      characteristic.addEventListener('characteristicvaluechanged', () => {
-        // This will be handled by useProximity hook
-      });
+      // Get LED write characteristic
+      const ledCharacteristic = await service.getCharacteristic(LED_WRITE_CHARACTERISTIC_UUID);
+      ledCharacteristicRef.current = ledCharacteristic;
+
+      // Get Buzzer write characteristic
+      const buzzerCharacteristic = await service.getCharacteristic(BUZZER_WRITE_CHARACTERISTIC_UUID);
+      buzzerCharacteristicRef.current = buzzerCharacteristic;
 
       deviceRef.current = device;
-      characteristicRef.current = characteristic;
 
       setConnectedDevice({
         id: device.id,
@@ -47,6 +54,8 @@ export default function useBLE() {
       });
 
       console.log('Connected to device:', device.name);
+      console.log('LED characteristic UUID:', LED_WRITE_CHARACTERISTIC_UUID);
+      console.log('Buzzer characteristic UUID:', BUZZER_WRITE_CHARACTERISTIC_UUID);
     } catch (error) {
       console.error('Connection error:', error);
       if (error.name !== 'NotFoundError') {
@@ -58,9 +67,8 @@ export default function useBLE() {
   const disconnect = useCallback(async () => {
     if (deviceRef.current) {
       try {
-        // Stop notifications
-        if (characteristicRef.current) {
-          await characteristicRef.current.stopNotifications();
+        if (rssiCharacteristicRef.current) {
+          await rssiCharacteristicRef.current.stopNotifications();
         }
         deviceRef.current.gatt.disconnect();
         console.log('Disconnected from device');
@@ -68,7 +76,9 @@ export default function useBLE() {
         console.error('Disconnect error:', error);
       }
       deviceRef.current = null;
-      characteristicRef.current = null;
+      rssiCharacteristicRef.current = null;
+      ledCharacteristicRef.current = null;
+      buzzerCharacteristicRef.current = null;
       setConnectedDevice(null);
     }
   }, []);
@@ -96,7 +106,6 @@ export default function useBLE() {
         }];
       });
 
-      // Automatically connect to newly discovered device
       if (device) {
         await connect(device.id, device.name);
       }
@@ -120,30 +129,47 @@ export default function useBLE() {
     });
   }, []);
 
-  const sendValue = useCallback(async (value) => {
-    if (!connectedDevice?.device) return;
+  // Send LED brightness (0-255)
+  const sendLedBrightness = useCallback(async (brightness) => {
+    if (!ledCharacteristicRef.current) return;
 
     try {
-      const service = await connectedDevice.device.gatt.getPrimaryService(SERVICE_UUID);
-      const characteristic = await service.getCharacteristic(WRITE_CHARACTERISTIC_UUID);
-      
-      // Send as 1-byte unsigned integer (0-255)
-      const data = new Uint8Array([Math.min(value, 255)]);
-      await characteristic.writeValue(data);
+      const data = new Uint8Array([Math.min(Math.max(brightness, 0), 255)]);
+      await ledCharacteristicRef.current.writeValue(data);
+      console.log('LED brightness sent:', brightness);
     } catch (error) {
-      console.error('Send value error:', error);
+      console.error('Send LED brightness error:', error);
     }
-  }, [connectedDevice]);
+  }, []);
+
+  // Send buzzer volume (0-255)
+  const sendBuzzerVolume = useCallback(async (volume) => {
+    if (!buzzerCharacteristicRef.current) return;
+
+    try {
+      const data = new Uint8Array([Math.min(Math.max(volume, 0), 255)]);
+      await buzzerCharacteristicRef.current.writeValue(data);
+      console.log('Buzzer volume sent:', volume);
+    } catch (error) {
+      console.error('Send buzzer volume error:', error);
+    }
+  }, []);
+
+  // Backward compatible sendValue for generic use
+  const sendValue = useCallback(async (value, type = 'led') => {
+    if (type === 'led') {
+      await sendLedBrightness(value);
+    } else if (type === 'buzzer') {
+      await sendBuzzerVolume(value);
+    }
+  }, [sendLedBrightness, sendBuzzerVolume]);
 
   const getRSSI = useCallback(async () => {
-    if (!connectedDevice?.device) return null;
+    if (!rssiCharacteristicRef.current) return null;
 
     try {
-      const service = await connectedDevice.device.gatt.getPrimaryService(SERVICE_UUID);
-      const characteristic = await service.getCharacteristic(RSSI_CHARACTERISTIC_UUID);
-      const value = await characteristic.readValue();
+      const value = await rssiCharacteristicRef.current.readValue();
       
-      // Read as 2-byte signed integer (little-endian)
       const view = new DataView(value.buffer);
       const rssi = view.getInt16(0, true);
       
@@ -152,7 +178,7 @@ export default function useBLE() {
       console.error('Read RSSI error:', error);
       return null;
     }
-  }, [connectedDevice]);
+  }, []);
 
   return {
     devices,
@@ -163,6 +189,8 @@ export default function useBLE() {
     discoveryInProgress,
     startDiscovery,
     sendValue,
+    sendLedBrightness,
+    sendBuzzerVolume,
     getRSSI
   };
 }

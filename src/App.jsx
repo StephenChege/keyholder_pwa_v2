@@ -24,7 +24,9 @@ export default function App() {
     disconnect, 
     renameDevice,
     discoveryInProgress,
-    startDiscovery 
+    startDiscovery,
+    sendLedBrightness,
+    sendBuzzerVolume
   } = useBLE();
 
   const { 
@@ -43,7 +45,7 @@ export default function App() {
   const [ledBrightness, setLedBrightness] = useState(50);
   const [buzzerOn, setBuzzerOn] = useState(false);
   const [buzzerVolume, setBuzzerVolume] = useState(50);
-  const [proximityEnabled, setProximityEnabled] = useState(true);
+  const [proximityEnabled, setProximityEnabled] = useState(false);
 
   // Save theme preference
   useEffect(() => {
@@ -122,6 +124,8 @@ export default function App() {
           onDisconnect={() => {
             disconnect();
             setSelectedDeviceId(null);
+            setLedOn(false);
+            setBuzzerOn(false);
           }}
           onRenameDevice={(newName) => {
             if (currentDevice) {
@@ -169,6 +173,8 @@ export default function App() {
             rssi={rssi}
             darkMode={darkMode}
             connectedDevice={connectedDevice}
+            sendLedBrightness={sendLedBrightness}
+            sendBuzzerVolume={sendBuzzerVolume}
           />
         )}
 
