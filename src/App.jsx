@@ -21,6 +21,12 @@ export default function App() {
   // Buzzer state
   const [buzzerOn, setBuzzerOn] = useState(false);
   const [buzzerVolume, setBuzzerVolume] = useState(50);
+  
+  // Proximity state
+  const [proximityEnabled, setProximityEnabled] = useState(() => {
+    const saved = localStorage.getItem('keyholder-proximity');
+    return saved ? saved === 'true' : false;
+  });
 
   const { 
     connectedDevice, 
@@ -29,7 +35,9 @@ export default function App() {
     discoveryInProgress,
     startDiscovery,
     sendLedBrightness,
-    sendBuzzerVolume
+    sendBuzzerVolume,
+    rssi,
+    proximityPercent
   } = useBLE();
 
   // Save theme preference
@@ -43,6 +51,11 @@ export default function App() {
       localStorage.setItem('keyholder-device-name', deviceName);
     }
   }, [deviceName]);
+
+  // Save proximity preference
+  useEffect(() => {
+    localStorage.setItem('keyholder-proximity', proximityEnabled ? 'true' : 'false');
+  }, [proximityEnabled]);
 
   const handleAddDevice = async () => {
     await startDiscovery();
@@ -59,6 +72,7 @@ export default function App() {
       localStorage.clear();
       setDeviceName('My Device');
       setDarkMode(true);
+      setProximityEnabled(false);
       setLedOn(false);
       setBuzzerOn(false);
       handleDisconnect();
@@ -143,6 +157,10 @@ export default function App() {
               setBuzzerOn={setBuzzerOn}
               buzzerVolume={buzzerVolume}
               setBuzzerVolume={setBuzzerVolume}
+              proximityEnabled={proximityEnabled}
+              setProximityEnabled={setProximityEnabled}
+              proximityPercent={proximityPercent}
+              rssi={rssi}
               darkMode={darkMode}
               connectedDevice={connectedDevice}
               sendLedBrightness={sendLedBrightness}
